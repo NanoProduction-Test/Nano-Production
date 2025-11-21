@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nano AI - Stable Fix</title>
+    
+    <!-- 1. LIBRARIES -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- 2. CONFIG -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'], mono: ['"Fira Code"', 'monospace'] },
+                    colors: { nano: { bg: 'var(--color-bg)', panel: 'var(--color-panel)', surface: 'var(--color-surface)', primary: 'var(--color-primary)', text: 'var(--color-text)', border: 'var(--color-border)' } },
+                    animation: { 'message-in': 'messageIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)', 'pulse-soft': 'pulseSoft 2s infinite' },
+                    keyframes: { messageIn: { '0%': { opacity: '0', transform: 'translateY(10px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } } }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --color-bg: #131314; --color-panel: #1e1f20; --color-surface: #282a2c; --color-primary: #a8c7fa; --color-text: #e3e3e3; --color-border: #444746;
+            --bg-gradient-1: rgba(168, 199, 250, 0.05); --bg-gradient-2: rgba(168, 199, 250, 0.02);
+        }
+        body { 
+            background-color: var(--color-bg); color: var(--color-text); overflow: hidden; 
+            transition: background-color 0.5s ease, color 0.3s ease;
+            background-image: radial-gradient(circle at 10% 20%, var(--bg-gradient-1), transparent 40%), radial-gradient(circle at 90% 80%, var(--bg-gradient-2), transparent 40%);
+            background-attachment: fixed;
+        }
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: var(--color-panel); border-left: 1px solid var(--color-bg); }
+        ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 5px; border: 2px solid var(--color-panel); }
+        ::-webkit-scrollbar-thumb:hover { background: #6e7072; }
+
+        .glass-panel { background: color-mix(in srgb, var(--color-panel), transparent 10%); backdrop-filter: blur(16px); border: 1px solid var(--color-border); box-shadow: 0 4px 30px rgba(0,0,0,0.2); }
+        .glass-input { background: color-mix(in srgb, var(--color-panel), transparent 5%); backdrop-filter: blur(20px); border: 1px solid var(--color-border); box-shadow: 0 -5px 20px rgba(0,0,0,0.2); }
+        
+        .prose { font-size: 0.95rem; line-height: 1.7; color: var(--color-text); max-width: none; }
+        .prose p { margin-bottom: 1em; } 
+        .prose h1, .prose h2, .prose h3 { color: #fff; font-weight: 600; margin-top: 1.5em; margin-bottom: 0.5em; }
+        .prose code { background: color-mix(in srgb, var(--color-primary), transparent 85%); color: color-mix(in srgb, var(--color-primary), white 20%); padding: 0.2em 0.4em; border-radius: 6px; font-family: 'Fira Code', monospace; font-size: 0.85em; }
+        .prose pre { background: #000 !important; padding: 1.2rem; border-radius: 0.75rem; border: 1px solid var(--color-border); margin: 1.5rem 0; overflow-x: auto; }
+        .prose a { color: var(--color-primary); text-decoration: none; border-bottom: 1px dotted var(--color-primary); }
+        
+        .typing-cursor::after { content: '▋'; color: var(--color-primary); animation: blink 1s step-start infinite; margin-left: 2px; } 
+        @keyframes blink { 50% { opacity: 0; } }
+        
+        .source-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--color-border); border-radius: 999px; font-size: 12px; color: var(--color-text); opacity: 0.8; text-decoration: none !important; transition: all 0.2s; margin-right: 8px; margin-top: 8px; }
+        .source-chip:hover { border-color: var(--color-primary); opacity: 1; }
+        
+        .welcome-btn { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 9999px; color: var(--color-text); font-size: 0.9rem; transition: all 0.2s ease; cursor: pointer; text-align: left; }
+        .welcome-btn:hover { background: var(--color-surface); border-color: var(--color-primary); }
+        
+        .edit-mode textarea { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; width: 100%; padding: 10px; color: var(--color-text); outline: none; resize: none; margin-bottom: 8px; }
+        .edit-mode textarea:focus { border-color: var(--color-primary); }
+        
+        .toggle-active-search { color: #c4eed0; background-color: rgba(196, 238, 208, 0.1); border-color: rgba(196, 238, 208, 0.2); } 
+        .toggle-active-deep { color: #d8b4fe; background-color: rgba(216, 180, 254, 0.1); border-color: rgba(216, 180, 254, 0.2); }
+    </style>
+</head>
+<body class="h-screen flex font-sans selection:bg-nano-primary selection:text-black">
+
+    <!-- MODAL SETTINGS -->
+    <div id="settings-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm hidden transition-opacity duration-300">
+        <div class="bg-nano-panel w-full max-w-md rounded-3xl p-6 m-4 shadow-2xl border border-nano-border animate-message-in max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-white">Pengaturan Nano</h2>
+                <button onclick="toggleSettings()" class="text-white/50 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            
+            <div class="space-y-5">
+                <div>
+                    <label class="block text-xs font-bold text-white/50 mb-3 uppercase tracking-wider">Pilih Tema</label>
+                    <div class="flex gap-3 justify-center p-3 bg-black/20 rounded-xl border border-nano-border flex-wrap">
+                        <button onclick="setTheme('nebula')" class="theme-btn bg-[#131314] ring-1 ring-[#a8c7fa] w-8 h-8 rounded-full border-2 border-transparent hover:scale-110 transition-transform" title="Nebula"></button>
+                        <button onclick="setTheme('ocean')" class="theme-btn bg-[#0f172a] ring-1 ring-[#38bdf8] w-8 h-8 rounded-full border-2 border-transparent hover:scale-110 transition-transform" title="Ocean"></button>
+                        <button onclick="setTheme('forest')" class="theme-btn bg-[#022c22] ring-1 ring-[#34d399] w-8 h-8 rounded-full border-2 border-transparent hover:scale-110 transition-transform" title="Forest"></button>
+                        <button onclick="setTheme('magma')" class="theme-btn bg-[#2a0a0a] ring-1 ring-[#f87171] w-8 h-8 rounded-full border-2 border-transparent hover:scale-110 transition-transform" title="Magma"></button>
+                        <button onclick="setTheme('midnight')" class="theme-btn bg-[#000000] ring-1 ring-[#71717a] w-8 h-8 rounded-full border-2 border-transparent hover:scale-110 transition-transform" title="Midnight"></button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-white/50 mb-2 uppercase tracking-wider">Kunci Akses (Wajib)</label>
+                    <input type="password" id="api-key" class="w-full bg-nano-bg border border-nano-border rounded-xl px-4 py-3 text-sm text-white focus:border-nano-primary outline-none placeholder-white/20" placeholder="Paste API Key Gemini disini...">
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[11px] text-nano-primary hover:underline mt-2 inline-flex items-center gap-1 font-medium">Dapatkan Key Gratis <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-white/50 mb-2 uppercase tracking-wider">Nama Panggilan</label>
+                        <input type="text" id="user-name" class="w-full bg-nano-bg border border-nano-border rounded-xl px-4 py-3 text-sm text-white focus:border-nano-primary outline-none" placeholder="User">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-white/50 mb-2 uppercase tracking-wider">Gaya Bicara</label>
+                        <select id="ai-tone" class="w-full bg-nano-bg border border-nano-border rounded-xl px-4 py-3 text-sm text-white focus:border-nano-primary outline-none cursor-pointer">
+                            <option value="neutral">Normal</option>
+                            <option value="tech_expert">Pakar Tekno</option>
+                            <option value="friendly">Ramah</option>
+                            <option value="sarcastic">Sarkastik</option>
+                            <option value="formal">Formal</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-white/50 mb-2 uppercase tracking-wider">Instruksi Tambahan</label>
+                    <textarea id="system-instruction" rows="2" class="w-full bg-nano-bg border border-nano-border rounded-xl px-4 py-3 text-sm text-white focus:border-nano-primary outline-none resize-none" placeholder="Contoh: Fokus pada data terbaru..."></textarea>
+                </div>
+                <button onclick="saveSettings()" class="w-full bg-nano-primary hover:opacity-90 text-black font-bold py-3 rounded-xl shadow-lg shadow-nano-primary/20 transition-all transform active:scale-[0.98]">Simpan Perubahan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="w-72 bg-nano-panel flex-col shrink-0 border-r border-nano-border hidden md:flex transition-all duration-300">
+        <div class="p-4">
+            <button onclick="startNewChat()" class="w-full py-3 px-4 bg-nano-surface hover:brightness-110 rounded-full text-sm text-nano-text hover:text-white transition-all flex items-center gap-3 text-left shadow-sm border border-transparent hover:border-nano-border group">
+                <div class="bg-nano-bg w-6 h-6 rounded-full flex items-center justify-center text-nano-primary group-hover:scale-110 transition-transform"><i class="fa-solid fa-plus text-xs"></i></div>
+                <span class="font-medium">Chat Baru</span>
+            </button>
+        </div>
+        <div class="px-6 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest">Riwayat</div>
+        <div id="history-list" class="flex-1 overflow-y-auto px-3 space-y-1 pb-4 scrollbar-thin"></div>
+        <div class="p-4 border-t border-nano-border bg-nano-bg/30">
+            <button onclick="toggleSettings(true)" class="flex items-center gap-3 text-sm text-white/60 hover:text-white w-full p-2 rounded-lg hover:bg-nano-surface transition-colors">
+                <i class="fa-solid fa-sliders"></i> Pengaturan & Tema
+            </button>
+        </div>
+    </aside>
+
+    <!-- MAIN LAYOUT -->
+    <div class="flex-1 flex flex-col relative h-full w-full bg-nano-bg transition-colors duration-500">
+        
+        <!-- Top Bar Mobile -->
+        <div class="md:hidden h-14 flex items-center justify-between px-4 border-b border-nano-border bg-nano-bg z-20">
+            <button onclick="toggleSidebarMobile()" class="text-white/60"><i class="fa-solid fa-bars"></i></button>
+            <span class="font-medium text-white">Nano AI</span>
+            <button onclick="startNewChat()" class="text-white/60"><i class="fa-solid fa-pen-to-square"></i></button>
+        </div>
+
+        <!-- CHAT SCROLL AREA -->
+        <main id="chat-container" class="flex-1 overflow-y-auto scroll-smooth w-full relative">
+            <div id="chat-box" class="w-full max-w-3xl mx-auto px-4 md:px-6 pt-8 pb-[320px] space-y-8">
+                <!-- Welcome Screen -->
+                <div id="welcome-msg" class="flex flex-col items-center justify-center min-h-[60vh] animate-message-in">
+                    <h1 class="text-4xl font-bold text-white mb-10 text-center tracking-tight">Apa yang bisa saya bantu?</h1>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">
+                        <button onclick="quickPrompt('Bantu tuliskan email formal untuk...')" class="welcome-btn group"><i class="fa-solid fa-pen-nib text-purple-400 group-hover:scale-110 transition-transform"></i><span>Bantu tuliskan</span></button>
+                        <button onclick="quickPrompt('Analisis data berikut ini...')" class="welcome-btn group"><i class="fa-solid fa-chart-simple text-blue-400 group-hover:scale-110 transition-transform"></i><span>Analisis data</span></button>
+                        <button onclick="quickPrompt('Ayo diskusikan tentang topik...')" class="welcome-btn group"><i class="fa-regular fa-lightbulb text-yellow-400 group-hover:scale-110 transition-transform"></i><span>Diskusikan</span></button>
+                        <button onclick="quickPrompt('Rangkum teks panjang berikut...')" class="welcome-btn group"><i class="fa-regular fa-file-lines text-orange-400 group-hover:scale-110 transition-transform"></i><span>Rangkum teks</span></button>
+                        <button onclick="quickPrompt('Saya butuh nasihat tentang...')" class="welcome-btn group"><i class="fa-solid fa-graduation-cap text-cyan-400 group-hover:scale-110 transition-transform"></i><span>Dapatkan nasihat</span></button>
+                        <button onclick="quickPrompt('Buatkan rencana liburan ke...')" class="welcome-btn group"><i class="fa-solid fa-list-check text-yellow-300 group-hover:scale-110 transition-transform"></i><span>Buatkan rencana</span></button>
+                        <button onclick="quickPrompt('Ceritakan fakta unik yang mengejutkan')" class="welcome-btn group"><i class="fa-solid fa-gift text-pink-400 group-hover:scale-110 transition-transform"></i><span>Kejutkan saya</span></button>
+                        <button onclick="quickPrompt('Buatkan kode program untuk...')" class="welcome-btn group"><i class="fa-solid fa-code text-blue-500 group-hover:scale-110 transition-transform"></i><span>Buat Kode</span></button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- INPUT AREA -->
+        <div class="absolute bottom-0 left-0 right-0 z-30">
+            <div class="h-24 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/90 to-transparent pointer-events-none transition-colors duration-500"></div>
+            
+            <div class="bg-nano-bg px-4 pb-6 transition-colors duration-500">
+                <div class="max-w-3xl mx-auto relative">
+                    
+                    <!-- Preview & Mode Indicators -->
+                    <div class="flex justify-between items-center mb-2 px-2">
+                        <div id="preview-container" class="hidden flex gap-2"></div>
+                        <!-- Status Indicators -->
+                        <div class="flex gap-2 ml-auto">
+                            <div id="mode-indicator-search" class="hidden text-[10px] bg-[#c4eed0]/10 text-[#c4eed0] px-2 py-0.5 rounded border border-[#c4eed0]/20 flex items-center gap-1 transition-all">
+                                <div class="w-1.5 h-1.5 bg-[#10b981] rounded-full animate-pulse"></div> Live Search
+                            </div>
+                            <div id="mode-indicator-deep" class="hidden text-[10px] bg-[#d8b4fe]/10 text-[#d8b4fe] px-2 py-0.5 rounded border border-[#d8b4fe]/20 flex items-center gap-1 transition-all">
+                                <div class="w-1.5 h-1.5 bg-[#a855f7] rounded-full animate-pulse"></div> Deep Think
+                            </div>
+                            <!-- Hybrid Badge -->
+                            <div id="mode-indicator-hybrid" class="hidden text-[10px] bg-gradient-to-r from-green-900/50 to-purple-900/50 text-white px-2 py-0.5 rounded border border-white/10 flex items-center gap-1 transition-all shadow-[0_0_10px_rgba(16,185,129,0.3)]">
+                                <i class="fa-solid fa-bolt text-yellow-400 text-[8px]"></i> HYBRID MODE
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="input-area flex flex-col relative shadow-2xl shadow-black/50">
+                        <div class="flex items-center p-2 pl-3 gap-1 border-b border-nano-border/30 flex-wrap">
+                            <button onclick="document.getElementById('file-input').click()" class="text-white/50 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors tooltip-btn relative group" title="Lampirkan File">
+                                <i class="fa-solid fa-paperclip"></i>
+                            </button>
+                            <div class="h-4 w-px bg-nano-border mx-1"></div>
+                            
+                            <!-- Search Toggle -->
+                            <button id="btn-search" onclick="toggleSearch()" class="text-[#c4eed0] bg-[#c4eed0]/10 border border-[#c4eed0]/20 p-2 rounded-lg transition-colors tooltip-btn flex items-center gap-2">
+                                <i class="fa-solid fa-globe"></i> <span id="txt-search" class="text-[10px] font-bold">Live</span>
+                            </button>
+
+                            <!-- Deep Think Toggle -->
+                            <button id="btn-deep" onclick="toggleDeepThink()" class="text-white/50 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors tooltip-btn flex items-center gap-2">
+                                <i class="fa-solid fa-brain"></i> <span id="txt-deep" class="text-[10px] font-bold hidden">Deep</span>
+                            </button>
+                            
+                            <div class="flex-1"></div>
+                            <button id="mic-btn" onclick="toggleVoice()" class="text-white/50 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors tooltip-btn">
+                                <i class="fa-solid fa-microphone"></i>
+                            </button>
+                        </div>
+
+                        <div class="flex items-end p-2">
+                            <input type="file" id="file-input" accept="image/*,application/pdf,.txt,.docx,.js,.py,.html,.css,.json" class="hidden" onchange="handleFileUpload()">
+                            <div class="flex-1 max-h-48 overflow-y-auto py-2 pl-2">
+                                <textarea id="user-input" rows="1" class="w-full bg-transparent text-nano-text placeholder-white/30 text-base focus:outline-none resize-none font-sans" placeholder="Tanya Nano..." style="min-height: 24px;"></textarea>
+                            </div>
+                            <button id="send-btn" onclick="sendMessage()" class="text-white/50 hover:text-white p-2 mb-1 rounded-full hover:bg-white/10 transition-colors disabled:opacity-50">
+                                <i class="fa-solid fa-circle-arrow-up text-2xl"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-center text-[10px] text-white/40 mt-3 font-mono">Nano AI v9.9 • Stable Ultimate</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="tts-audio" class="hidden"></audio>
+
+    <!-- 7. JAVASCRIPT LOGIC -->
+    <script>
+        // --- THEMES ---
+        const themes = {
+            nebula: { bg: '#131314', panel: '#1e1f20', surface: '#282a2c', primary: '#a8c7fa', text: '#e3e3e3', border: '#444746' },
+            ocean: { bg: '#0f172a', panel: '#1e293b', surface: '#334155', primary: '#38bdf8', text: '#f1f5f9', border: '#475569' },
+            forest: { bg: '#052e16', panel: '#064e3b', surface: '#065f46', primary: '#34d399', text: '#ecfdf5', border: '#047857' },
+            magma: { bg: '#2a0a0a', panel: '#450a0a', surface: '#571010', primary: '#f87171', text: '#fef2f2', border: '#7f1d1d' },
+            midnight: { bg: '#000000', panel: '#121212', surface: '#1e1e1e', primary: '#ffffff', text: '#d4d4d4', border: '#27272a' }
+        };
+
+        // --- APP STATE ---
+        let state = { apiKey: '', history: [], currentSessionId: null, currentFile: null, isTyping: false, abortController: null, useSearch: true, useDeepThink: false, userName: 'Pengguna', aiTone: 'tech_expert', customInstruct: '', currentTheme: 'nebula' };
+        
+        // DOM Elements (Global)
+        let els = {};
+
+        // --- INIT (CRITICAL FIX: All init inside DOMContentLoaded) ---
+        window.addEventListener('DOMContentLoaded', () => {
+            // 1. Initialize DOM Elements
+            els = {
+                chatBox: document.getElementById('chat-box'), input: document.getElementById('user-input'), sendBtn: document.getElementById('send-btn'), modal: document.getElementById('settings-modal'), apiKeyInput: document.getElementById('api-key'), previewContainer: document.getElementById('preview-container'), welcome: document.getElementById('welcome-msg'), historyList: document.getElementById('history-list'), sidebar: document.getElementById('sidebar'), audio: document.getElementById('tts-audio'), micBtn: document.getElementById('mic-btn'), 
+                btnSearch: document.getElementById('btn-search'), btnDeep: document.getElementById('btn-deep'), 
+                indicatorSearch: document.getElementById('mode-indicator-search'), indicatorDeep: document.getElementById('mode-indicator-deep'), indicatorHybrid: document.getElementById('mode-indicator-hybrid'),
+                txtSearch: document.getElementById('txt-search'), txtDeep: document.getElementById('txt-deep'),
+                inputName: document.getElementById('user-name'), inputTone: document.getElementById('ai-tone'), inputInstruct: document.getElementById('system-instruction')
+            };
+
+            // 2. Load State
+            state.apiKey = localStorage.getItem('nano_key') || '';
+            state.history = JSON.parse(localStorage.getItem('nano_sessions')) || [];
+            state.userName = localStorage.getItem('nano_username') || 'Pengguna';
+            state.aiTone = localStorage.getItem('nano_tone') || 'tech_expert';
+            state.customInstruct = localStorage.getItem('nano_instruct') || '';
+            state.currentTheme = localStorage.getItem('nano_theme') || 'nebula';
+
+            // 3. Apply Initial State (Safely)
+            setTheme(state.currentTheme);
+            if (!state.apiKey) els.modal.classList.remove('hidden');
+            
+            if(els.inputName) els.inputName.value = state.userName;
+            if(els.inputTone) els.inputTone.value = state.aiTone;
+            if(els.inputInstruct) els.inputInstruct.value = state.customInstruct;
+
+            renderSidebar(); 
+            startNewChat(); 
+            adjustHeight();
+            
+            marked.setOptions({ highlight: function(code, lang) { const language = highlight.getLanguage(lang) ? lang : 'plaintext'; return highlight.highlight(code, { language }).value; } });
+            
+            updateToggleUI();
+
+            // 4. Attach Listeners
+            if(els.input) {
+                els.input.addEventListener('input', adjustHeight);
+                els.input.addEventListener('keydown', (e) => { if(e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+            }
+        });
+
+        // --- FUNCTIONS ---
+        function setTheme(name) {
+            state.currentTheme = name; localStorage.setItem('nano_theme', name);
+            const t = themes[name]; const r = document.documentElement;
+            r.style.setProperty('--color-bg', t.bg); r.style.setProperty('--color-panel', t.panel);
+            r.style.setProperty('--color-surface', t.surface); r.style.setProperty('--color-primary', t.primary);
+            r.style.setProperty('--color-text', t.text); r.style.setProperty('--color-border', t.border);
+            document.querySelectorAll('.theme-btn').forEach(btn => { 
+                btn.classList.remove('active', 'ring-2', 'ring-offset-2', 'ring-offset-black'); 
+                if(btn.onclick.toString().includes(name)) btn.classList.add('active', 'ring-2', 'ring-offset-2', 'ring-offset-black'); 
+            });
+        }
+
+        function updateToggleUI() {
+            if (state.useSearch) { els.btnSearch.className = "text-[#c4eed0] bg-[#c4eed0]/10 border border-[#c4eed0]/20 p-2 rounded-lg transition-colors tooltip-btn flex items-center gap-2"; els.txtSearch.classList.remove('hidden'); els.indicatorSearch.classList.remove('hidden'); } 
+            else { els.btnSearch.className = "text-white/50 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors tooltip-btn flex items-center gap-2"; els.txtSearch.classList.add('hidden'); els.indicatorSearch.classList.add('hidden'); }
+            
+            if (state.useDeepThink) { els.btnDeep.className = "text-[#d8b4fe] bg-[#d8b4fe]/10 border border-[#d8b4fe]/20 p-2 rounded-lg transition-colors tooltip-btn flex items-center gap-2"; els.txtDeep.classList.remove('hidden'); els.indicatorDeep.classList.remove('hidden'); } 
+            else { els.btnDeep.className = "text-white/50 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors tooltip-btn flex items-center gap-2"; els.txtDeep.classList.add('hidden'); els.indicatorDeep.classList.add('hidden'); }
+
+            if(state.useSearch && state.useDeepThink && els.indicatorHybrid) {
+                els.indicatorHybrid.classList.remove('hidden');
+                els.indicatorSearch.classList.add('hidden'); 
+                els.indicatorDeep.classList.add('hidden');
+            } else if(els.indicatorHybrid) {
+                els.indicatorHybrid.classList.add('hidden');
+                if(state.useSearch) els.indicatorSearch.classList.remove('hidden');
+                if(state.useDeepThink) els.indicatorDeep.classList.remove('hidden');
+            }
+        }
+
+        function toggleSearch() { state.useSearch = !state.useSearch; updateToggleUI(); }
+        function toggleDeepThink() { state.useDeepThink = !state.useDeepThink; updateToggleUI(); }
+
+        function saveSettings() { 
+            const k = els.apiKeyInput.value; 
+            if(k) { 
+                localStorage.setItem('nano_key', k); state.apiKey = k; 
+                if(els.inputName) state.userName = els.inputName.value || 'Pengguna'; 
+                if(els.inputTone) state.aiTone = els.inputTone.value; 
+                if(els.inputInstruct) state.customInstruct = els.inputInstruct.value; 
+                localStorage.setItem('nano_username', state.userName); 
+                localStorage.setItem('nano_tone', state.aiTone); 
+                localStorage.setItem('nano_instruct', state.customInstruct); 
+                toggleSettings(); 
+            } 
+        }
+
+        function buildSystemInstruction() {
+            let instruction = `You are Nano, an advanced AI assistant. Current Date: ${new Date().toLocaleDateString('id-ID')}. `;
+            if (state.useSearch && state.useDeepThink) {
+                instruction += "MODE: HYBRID INTELLIGENCE. 1) Use Google Search for latest facts. 2) Use Deep Analysis to synthesize, reason, and structure the answer comprehensively. ";
+            } else if (state.useSearch) {
+                instruction += "CRITICAL: Use Google Search for real-time info (news, stocks, tech specs). ";
+            } else if (state.useDeepThink) {
+                instruction += "MODE: Deep Analysis. Break down problems step-by-step. ";
+            }
+            if (state.userName) instruction += `User: ${state.userName}. `;
+            switch(state.aiTone) { case 'friendly': instruction += "Tone: Friendly. "; break; case 'professional': instruction += "Tone: Formal. "; break; case 'sarcastic': instruction += "Tone: Sarcastic. "; break; default: instruction += "Tone: Helpful. "; }
+            return instruction + state.customInstruct;
+        }
+
+        async function sendMessage() {
+            if (state.isTyping) return stopGeneration();
+            const text = els.input.value.trim(); if (!text && !state.currentFile) return; if (!state.apiKey) { toggleSettings(true); els.apiKeyInput.focus(); return; }
+            
+            let currentSession = state.history.find(s => s.id === state.currentSessionId);
+            if (!currentSession) { startNewChat(); currentSession = state.history.find(s => s.id === state.currentSessionId); }
+            
+            els.welcome.classList.add('hidden'); const fileData = state.currentFile; renderMessage(text, 'user', fileData);
+            currentSession.messages.push({ role: 'user', text: text, file: fileData });
+            updateChatTitle(state.currentSessionId, text || "File Attachment"); saveHistory();
+
+            els.input.value = ''; adjustHeight(); removeAttachment(); setStopButton(true); state.isTyping = true;
+            const aiMsgId = 'ai-' + Date.now(); createMessageContainer(aiMsgId, 'ai'); state.abortController = new AbortController();
+
+            try {
+                const parts = []; if (fileData) { if (fileData.type === 'text') parts.push({ text: `[Context File: ${fileData.name}]\n${fileData.data}\n\n` }); else parts.push({ inlineData: { mimeType: fileData.mime, data: fileData.data } }); } if (text) parts.push({ text: text });
+                const context = currentSession.messages.slice(0, -1).slice(-10).map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text || " " }] }));
+                const payload = { contents: [...context, { role: 'user', parts: parts }], generationConfig: { temperature: 0.7, maxOutputTokens: 4000 }, systemInstruction: { parts: [{ text: buildSystemInstruction() }] } };
+                if (state.useSearch) payload.tools = [{ google_search: {} }];
+
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${state.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: state.abortController.signal });
+                const data = await res.json(); if (!res.ok) throw new Error(data.error?.message || 'API Error');
+                const candidate = data.candidates[0]; const aiText = candidate.content.parts[0].text; const grounding = candidate.groundingMetadata;
+                await typeTextSafe(aiMsgId, aiText, grounding);
+                currentSession.messages.push({ role: 'ai', text: aiText, grounding: grounding }); saveHistory();
+            } catch (e) { if (e.name !== 'AbortError') document.getElementById(aiMsgId).innerHTML = `<span class="text-red-400">Error: ${e.message}</span>`; } finally { state.isTyping = false; setStopButton(false); }
+        }
+
+        async function typeTextSafe(elementId, text, grounding) {
+            const el = document.getElementById(elementId); const speed = 5; const chunks = text.match(/.{1,15}/g) || [];
+            el.classList.add('typing-cursor'); el.innerHTML = `<div class="whitespace-pre-wrap font-sans text-nano-text leading-relaxed"></div>`; const textContainer = el.querySelector('div');
+            for (const chunk of chunks) { if (!state.isTyping) break; textContainer.textContent += chunk; scrollToBottom(); await new Promise(r => setTimeout(r, speed)); }
+            el.classList.remove('typing-cursor'); let finalHtml = DOMPurify.sanitize(marked.parse(text));
+            if (grounding && grounding.groundingAttributions) { let sourcesHtml = '<div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-nano-border">'; grounding.groundingAttributions.forEach(att => { if (att.web && att.web.title && att.web.uri) { sourcesHtml += `<a href="${att.web.uri}" target="_blank" class="source-chip"><i class="fa-brands fa-google"></i> ${att.web.title}</a>`; } }); sourcesHtml += '</div>'; finalHtml += sourcesHtml; }
+            el.innerHTML = finalHtml; decorateCodeBlocks(el); renderMathInElement(el, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}] });
+            const actionsDiv = document.createElement('div'); actionsDiv.className = "flex gap-3 mt-3 pt-2 border-t border-nano-border/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"; actionsDiv.innerHTML = `<button onclick="copyToClipboard('${elementId}', this)" class="text-white/50 hover:text-white text-xs flex items-center gap-1"><i class="fa-regular fa-copy"></i> Copy</button><button id="tts-btn-${elementId}" onclick="playTTS(document.getElementById('${elementId}').innerText, 'tts-btn-${elementId}')" class="text-white/50 hover:text-white text-xs flex items-center gap-1"><i class="fa-solid fa-volume-high"></i> Dengar</button>`; el.parentNode.appendChild(actionsDiv);
+        }
+
+        // --- Standard Utils ---
+        function startNewChat() { state.currentSessionId = Date.now().toString(); state.history.unshift({ id: state.currentSessionId, title: 'Chat Baru', messages: [] }); saveHistory(); renderSidebar(); clearUI(); }
+        function loadChat(id) { const session = state.history.find(s => s.id === id); if (!session) return; state.currentSessionId = id; clearUI(false); if (session.messages.length > 0) { els.welcome.classList.add('hidden'); session.messages.forEach((msg, index) => { renderMessage(msg.text, msg.role, msg.file, false, msg.grounding, index); }); } else { els.welcome.classList.remove('hidden'); } renderSidebar(); }
+        function deleteChat(id, event) { event.stopPropagation(); state.history = state.history.filter(s => s.id !== id); saveHistory(); renderSidebar(); if (state.currentSessionId === id) startNewChat(); }
+        function saveHistory() { localStorage.setItem('nano_sessions', JSON.stringify(state.history)); }
+        function updateChatTitle(id, firstMessage) { const session = state.history.find(s => s.id === id); if (session && session.title === 'Chat Baru') { session.title = firstMessage.substring(0, 30) + (firstMessage.length>30?'...':''); saveHistory(); renderSidebar(); } }
+        function renderSidebar() { els.historyList.innerHTML = ''; state.history.forEach(session => { const activeClass = session.id === state.currentSessionId ? 'bg-nano-surface text-nano-primary' : 'text-white/50 hover:bg-nano-surface'; const div = document.createElement('div'); div.className = `group flex items-center gap-3 px-4 py-2 rounded-full cursor-pointer text-sm transition-colors mb-1 ${activeClass}`; div.onclick = () => loadChat(session.id); div.innerHTML = `<i class="fa-regular fa-message text-xs"></i><span class="truncate flex-1">${session.title}</span><button onclick="deleteChat('${session.id}', event)" class="opacity-0 group-hover:opacity-100 text-white/50 hover:text-white transition-opacity"><i class="fa-solid fa-trash text-xs"></i></button>`; els.historyList.appendChild(div); }); }
+        function renderMessage(text, role, file, animate = true, grounding = null, index) { 
+            if (role === 'ai') { const msgId = 'ai-' + Date.now() + Math.random(); createMessageContainer(msgId, 'ai'); const el = document.getElementById(msgId); let content = DOMPurify.sanitize(marked.parse(text)); if(grounding){ let sources='<div class="flex flex-wrap gap-2 mt-3 pt-3 border-t border-nano-border">'; grounding.groundingAttributions?.forEach(a=>{if(a.web) sources+=`<a href="${a.web.uri}" target="_blank" class="source-chip"><i class="fa-brands fa-google"></i> ${a.web.title}</a>`}); sources+='</div>'; content+=sources; } el.innerHTML = content; decorateCodeBlocks(el); renderMathInElement(el, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}] }); const actionsDiv = document.createElement('div'); actionsDiv.className = "flex gap-3 mt-3 pt-2 border-t border-nano-border/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"; actionsDiv.innerHTML = `<button onclick="copyToClipboard('${msgId}', this)" class="text-white/50 hover:text-white text-xs flex items-center gap-1"><i class="fa-regular fa-copy"></i> Copy</button><button id="tts-btn-${msgId}" onclick="playTTS(document.getElementById('${msgId}').innerText, 'tts-btn-${msgId}')" class="text-white/50 hover:text-white text-xs flex items-center gap-1"><i class="fa-solid fa-volume-high"></i> Dengar</button>`; el.parentNode.appendChild(actionsDiv); } 
+            else { const div = document.createElement('div'); div.className = "message-container flex justify-end mb-6 animate-message-in group relative"; div.setAttribute('data-index', index !== undefined ? index : state.history.find(s=>s.id===state.currentSessionId).messages.length - 1); let fileHtml = ''; if (file) { if (file.type === 'image') fileHtml = `<img src="${file.preview}" class="max-w-xs rounded-xl mb-2 border border-nano-border">`; else fileHtml = `<div class="flex items-center gap-2 bg-nano-surface p-3 rounded-xl mb-2 border border-nano-border"><i class="fa-solid fa-file text-nano-primary"></i><span class="text-xs">${file.name}</span></div>`; } div.innerHTML = `<div class="flex items-center gap-2"><div class="bg-nano-surface text-nano-text px-5 py-3 rounded-2xl rounded-tr-sm max-w-md relative">${fileHtml}<div class="prose text-sm leading-relaxed whitespace-pre-wrap">${text}</div></div><button onclick="enableEditMode(this)" class="w-8 h-8 rounded-full bg-nano-sidebar text-white/50 hover:text-white hover:bg-nano-surface flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 border border-nano-border" title="Edit"><i class="fa-solid fa-pencil text-xs"></i></button></div>`; els.chatBox.appendChild(div); scrollToBottom(); } 
+        }
+        function createMessageContainer(id, role) { const div = document.createElement('div'); div.className = "flex gap-4 mb-6 w-full max-w-3xl animate-message-in group"; div.innerHTML = `<div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-tr from-nano-primary to-nano-secondary flex items-center justify-center"><i class="fa-solid fa-sparkles text-white text-xs"></i></div><div class="flex-1 min-w-0 overflow-hidden"><div class="prose leading-relaxed text-nano-text" id="${id}"></div></div>`; els.chatBox.appendChild(div); return id; }
+        function decorateCodeBlocks(container) { container.querySelectorAll('pre').forEach(pre => { if(pre.parentNode.classList.contains('code-block-wrapper')) return; const code = pre.querySelector('code'); let lang = 'Code'; if (code.className) { const match = code.className.match(/language-(\w+)/); if (match) lang = match[1]; } const wrapper = document.createElement('div'); wrapper.className = 'code-block-wrapper'; const header = document.createElement('div'); header.className = 'code-header'; header.innerHTML = `<span>${lang}</span><button onclick="copyCode(this)" class="hover:text-white flex items-center gap-1"><i class="fa-regular fa-copy"></i> Copy</button>`; pre.parentNode.insertBefore(wrapper, pre); wrapper.appendChild(header); wrapper.appendChild(pre); hljs.highlightElement(code); }); }
+        function handleFileUpload() { const file = document.getElementById('file-input').files[0]; if (!file) return; const reader = new FileReader(); const previewItem = document.createElement('div'); previewItem.className = "relative group inline-block bg-nano-panel rounded-lg p-1 border border-nano-border mr-2"; if (file.type.startsWith('image/')) { reader.onload = (e) => { state.currentFile = { type: 'image', data: e.target.result.split(',')[1], mime: file.type, preview: e.target.result }; previewItem.innerHTML = `<img src="${e.target.result}" class="h-10 w-10 object-cover rounded"><button onclick="removeAttachment()" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"><i class="fa-solid fa-xmark"></i></button>`; els.previewContainer.innerHTML=''; els.previewContainer.appendChild(previewItem); els.previewContainer.classList.remove('hidden'); }; reader.readAsDataURL(file); } else { reader.onload = (e) => { state.currentFile = { type: 'text', data: e.target.result, name: file.name }; previewItem.innerHTML = `<div class="h-10 w-10 flex items-center justify-center text-nano-primary"><i class="fa-solid fa-file"></i></div><button onclick="removeAttachment()" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"><i class="fa-solid fa-xmark"></i></button>`; els.previewContainer.innerHTML=''; els.previewContainer.appendChild(previewItem); els.previewContainer.classList.remove('hidden'); }; reader.readAsText(file); } document.getElementById('file-input').value = ''; }
+        function removeAttachment() { state.currentFile = null; els.previewContainer.innerHTML = ''; els.previewContainer.classList.add('hidden'); }
+        function stopGeneration() { if (state.abortController) { state.abortController.abort(); state.abortController = null; document.querySelectorAll('.typing-cursor').forEach(c => c.classList.remove('typing-cursor')); } }
+        function setStopButton(isTyping) { if (isTyping) { els.sendBtn.innerHTML = '<i class="fa-solid fa-square text-lg"></i>'; els.sendBtn.onclick = stopGeneration; } else { els.sendBtn.innerHTML = '<i class="fa-solid fa-circle-arrow-up text-2xl"></i>'; els.sendBtn.onclick = sendMessage; } }
+        function clearUI(clearHistory = true) { els.chatBox.innerHTML = ''; if(clearHistory) els.chatBox.appendChild(els.welcome); removeAttachment(); }
+        function scrollToBottom() { if(els.chatBox.lastElementChild) { els.chatBox.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'end' }); } else { els.chatBox.scrollTop = els.chatBox.scrollHeight; } }
+        function adjustHeight() { els.input.style.height='auto'; els.input.style.height=Math.min(els.input.scrollHeight,160)+'px'; }
+        function quickPrompt(t) { els.input.value = t; sendMessage(); }
+        function toggleSidebar() { els.sidebar.classList.toggle('hidden'); }
+        function toggleSidebarMobile() { els.sidebar.classList.toggle('hidden'); els.sidebar.classList.add('absolute', 'z-50', 'h-full'); }
+        function toggleSettings(f) { document.getElementById('settings-modal').classList.toggle('hidden', !f); }
+        function copyCode(btn) { const code = btn.closest('.code-block-wrapper').querySelector('code').innerText; copyToClipboard(code, btn); }
+        function copyToClipboard(textOrId, btnElement = null) { let text = textOrId; if(document.getElementById(textOrId)) { text = document.getElementById(textOrId).innerText; } const textArea = document.createElement("textarea"); textArea.value = text; textArea.style.position = "fixed"; textArea.style.left = "-9999px"; document.body.appendChild(textArea); textArea.focus(); textArea.select(); try { document.execCommand('copy'); if(btnElement) { const original = btnElement.innerHTML; btnElement.innerHTML = '<i class="fa-solid fa-check text-green-400"></i>'; setTimeout(() => btnElement.innerHTML = original, 2000); } } catch (err) { alert("Gagal menyalin."); } document.body.removeChild(textArea); }
+        function pcmToWav(p,s=24000){const b=atob(p),l=b.length,u=new ArrayBuffer(44+l),v=new DataView(u),w=(d,o,x)=>{for(let i=0;i<x.length;i++)d.setUint8(o+i,x.charCodeAt(i))};w(v,0,'RIFF');v.setUint32(4,36+l,true);w(v,8,'WAVE');w(v,12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,s,true);v.setUint32(28,s*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(v,36,'data');v.setUint32(40,l,true);const d=new Uint8Array(u,44);for(let i=0;i<l;i++)d[i]=b.charCodeAt(i);return u}
+        let audioObj = null; let currentPlayingBtnId = null;
+        async function playTTS(text, btnId) { if (!state.apiKey) return; const btn = document.getElementById(btnId); const defaultIcon = '<i class="fa-solid fa-volume-high"></i> Dengar'; if (audioObj && !audioObj.paused && currentPlayingBtnId === btnId) { audioObj.pause(); audioObj = null; currentPlayingBtnId = null; btn.innerHTML = defaultIcon; btn.classList.remove('text-nano-primary', 'animate-pulse'); return; } if (audioObj) { audioObj.pause(); if (currentPlayingBtnId) { const prevBtn = document.getElementById(currentPlayingBtnId); if(prevBtn) { prevBtn.innerHTML = defaultIcon; prevBtn.classList.remove('text-nano-primary', 'animate-pulse'); } } } currentPlayingBtnId = btnId; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>'; btn.disabled = true; try { const u=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${state.apiKey}`,p={contents:[{parts:[{text:text.substring(0,500)}]}],generationConfig:{responseModalities:["AUDIO"],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:"Kore"}}}}}; const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});const dt=await r.json(); if(dt.candidates){const w=pcmToWav(dt.candidates[0].content.parts[0].inlineData.data);audioObj=new Audio(URL.createObjectURL(new Blob([w],{type:'audio/wav'})));audioObj.onended=()=>{btn.innerHTML=defaultIcon;btn.classList.remove('text-nano-primary', 'animate-pulse');currentPlayingBtnId=null;};await audioObj.play();btn.innerHTML='<i class="fa-solid fa-stop"></i> Stop';btn.classList.add('text-nano-primary', 'animate-pulse');btn.disabled=false;} } catch(e){console.error(e);btn.innerHTML=defaultIcon;btn.disabled=false;} }
+        let recognition; function toggleVoice(){if(!('webkitSpeechRecognition'in window))return alert("No Browser Support");if(recognition&&recognition.running){recognition.stop();return;}recognition=new webkitSpeechRecognition();recognition.lang='id-ID';recognition.onstart=()=>{els.micBtn.classList.add('text-red-500');els.input.placeholder="Mendengarkan...";};recognition.onend=()=>{els.micBtn.classList.remove('text-red-500');els.input.placeholder="Tanya Nano...";};recognition.onresult=(e)=>{els.input.value+=(els.input.value?' ':'')+e.results[0][0].transcript;adjustHeight();};recognition.start();}
+        
+        function enableEditMode(btn) { const container = btn.closest('.message-container'); if (!container) return; const historyIndex = parseInt(container.getAttribute('data-index')); const textDiv = container.querySelector('.prose'); const originalText = textDiv.innerText.trim(); const editWrapper = document.createElement('div'); editWrapper.className = 'edit-mode w-full animate-message-in'; const textarea = document.createElement('textarea'); textarea.value = originalText; setTimeout(() => { textarea.style.height = 'auto'; textarea.style.height = (textarea.scrollHeight + 10) + 'px'; }, 0); const actionDiv = document.createElement('div'); actionDiv.className = 'flex gap-2 mt-2 justify-end'; const saveBtn = document.createElement('button'); saveBtn.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Simpan'; saveBtn.className = 'bg-nano-primary hover:opacity-80 text-black px-4 py-1.5 rounded-lg text-xs font-bold transition-colors'; saveBtn.onclick = () => confirmEdit(historyIndex, textarea.value); const cancelBtn = document.createElement('button'); cancelBtn.innerHTML = 'Batal'; cancelBtn.className = 'bg-nano-surface hover:bg-nano-border text-white/50 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors'; cancelBtn.onclick = () => { textDiv.classList.remove('hidden'); editWrapper.remove(); }; actionDiv.appendChild(cancelBtn); actionDiv.appendChild(saveBtn); editWrapper.appendChild(textarea); editWrapper.appendChild(actionDiv); textDiv.classList.add('hidden'); textDiv.parentNode.insertBefore(editWrapper, textDiv); textarea.focus(); }
+        async function confirmEdit(msgIndex, newText) { if (!newText.trim()) return; let currentSession = state.history.find(s => s.id === state.currentSessionId); if (!currentSession) return; currentSession.messages = currentSession.messages.slice(0, msgIndex + 1); currentSession.messages[msgIndex].text = newText; const allMessages = document.querySelectorAll('.message-container'); allMessages.forEach(el => { const idx = parseInt(el.getAttribute('data-index')); if (idx > msgIndex) el.remove(); else if (idx === msgIndex) { const textDiv = el.querySelector('.prose'); textDiv.innerHTML = `<p>${newText.replace(/\n/g, '<br>')}</p>`; textDiv.classList.remove('hidden'); const editor = el.querySelector('.edit-mode'); if(editor) editor.remove(); } }); els.sendBtn.disabled = true; const loadingId = showTyping(); try { const contextMsgs = currentSession.messages.slice(0, -1).slice(-10).map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text || " " }] })); const payload = { contents: [...contextMsgs, { role: 'user', parts: [{ text: newText }] }], generationConfig: { temperature: 0.7, maxOutputTokens: 8192 }, systemInstruction: { parts: [{ text: buildSystemInstruction() }] } }; if (state.useSearch) payload.tools = [{ google_search: {} }]; const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${state.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: state.abortController.signal }); const data = await res.json(); removeTyping(loadingId); if (!res.ok) throw new Error(data.error?.message || 'API Error'); const candidate = data.candidates[0]; const aiText = candidate.content.parts[0].text; const grounding = candidate.groundingMetadata; await typeTextSafe('ai-'+Date.now(), aiText, grounding); currentSession.messages.push({ role: 'ai', text: aiText, grounding: grounding }); saveHistory(); } catch (e) { removeTyping(loadingId); addMessage(`Error: ${e.message}`, 'error'); } finally { els.sendBtn.disabled = false; } }
+        function showTyping(){const id='t-'+Date.now();const d=document.createElement('div');d.id=id;d.className='flex gap-4 animate-message-in';d.innerHTML=`<div class="w-9 h-9 rounded-xl bg-gradient-to-br from-nano-primary to-nano-secondary flex items-center justify-center text-white shadow-md shadow-nano-primary/20 shrink-0"><i class="fa-solid fa-robot text-xs"></i></div><div class="glass-panel px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-1 h-11 min-w-[3rem]"><div class="typing-dot bg-nano-primary"></div><div class="typing-dot bg-nano-primary"></div><div class="typing-dot bg-nano-primary"></div></div>`;els.chatBox.appendChild(d);scrollToBottom();return id;}
+        function removeTyping(id){const e=document.getElementById(id);if(e)e.remove();}
+    </script>
+</body>
+</html>
